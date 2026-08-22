@@ -1,0 +1,27 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  tei:
+    image: ghcr.io/huggingface/text-embeddings-inference:cpu-1.9
+    profiles: ["reranking"]
+    command:
+      - --model-id
+      - Alibaba-NLP/gte-multilingual-reranker-base
+      - --max-client-batch-size
+      - "50"
+      - --max-batch-tokens
+      - "2048"
+    ports:
+      - "127.0.0.1:8081:80"
+    volumes:
+      - tei_model_cache:/data
+
+volumes:
+  qdrant_storage:
+  tei_model_cache:

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="KnowledgeOps.Tests" />
+        <ProjectReference Include="../../src/KnowledgeOps.Application/KnowledgeOps.Application.csproj" />
+        <ProjectReference Include="../../src/KnowledgeOps.Infrastructure/KnowledgeOps.Infrastructure.csproj" />
+    </ItemGroup>
+</Project>

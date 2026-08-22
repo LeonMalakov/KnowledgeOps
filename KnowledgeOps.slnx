@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="src/KnowledgeOps.Api/KnowledgeOps.Api.csproj" />
+  <Project Path="src/KnowledgeOps.Application/KnowledgeOps.Application.csproj" />
+  <Project Path="src/KnowledgeOps.Infrastructure/KnowledgeOps.Infrastructure.csproj" />
+  <Project Path="tests/KnowledgeOps.Tests/KnowledgeOps.Tests.csproj" />
+  <Project Path="tools/KnowledgeOps.Evaluation/KnowledgeOps.Evaluation.csproj" />
+</Solution>

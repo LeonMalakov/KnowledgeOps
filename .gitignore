@@ -1,0 +1,45 @@
+# .NET build outputs
+**/bin/
+**/obj/
+artifacts/
+publish/
+
+# Rider / Visual Studio
+.idea/
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.sln.iml
+
+# Tests and coverage
+TestResults/
+**/TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+**/appsettings.Local.json
+**/secrets.json
+
+# Local data
+qdrant_storage/
+qdrant_data/
+data/uploads/
+data/temp/
+
+# Evaluation output
+/evaluation/results/

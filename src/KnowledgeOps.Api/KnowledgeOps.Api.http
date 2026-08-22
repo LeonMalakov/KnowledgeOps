@@ -1,0 +1,217 @@
+@baseUrl = http://localhost:5159
+
+### Index a document about payments
+POST {{baseUrl}}/api/documents
+Content-Type: application/json
+
+{
+  "title": "Способы оплаты",
+  "source": "help:payments",
+  "content": "К оплате принимаются банковские карты «Мир» и переводы через СБП. После успешной транзакции электронный чек отправляется на почту."
+}
+
+### Index a document about delivery
+POST {{baseUrl}}/api/documents
+Content-Type: application/json
+
+{
+  "title": "Сроки доставки",
+  "source": "help:delivery",
+  "content": "Заказы отправляем курьером. Посылка поступает получателю за три рабочих дня. Статус отправления доступен по трек-номеру."
+}
+
+> {%
+    if (response.status === 200) {
+        client.global.set("deliveryDocumentId", response.body.documentId);
+    }
+%}
+
+### Find the delivery document by meaning
+POST {{baseUrl}}/api/search
+Content-Type: application/json
+
+{
+  "query": "Сколько ждать, пока покупку привезут домой?",
+  "topK": 2
+}
+
+### Answer with reranked sources (Rag:RetrievalMode = reranked)
+# Start the optional CPU reranker with: docker compose up -d tei
+# The response sources include both score (cosine similarity) and rerankScore.
+# @timeout 180 s
+POST {{baseUrl}}/api/ask
+Content-Type: application/json
+
+{
+  "query": "Через сколько дней доставят покупку?",
+  "topK": 3
+}
+
+### Delete
+DELETE http://localhost:5159/api/documents/{{deliveryDocumentId}}
+
+### Update the indexed delivery document from three to five business days
+# Run the delivery POST once to set deliveryDocumentId.
+# @timeout 120 s
+PUT {{baseUrl}}/api/documents/{{deliveryDocumentId}}
+Content-Type: application/json
+
+{
+  "title": "Новые правила доставки",
+  "content": "Доставка занимает пять рабочих дней.",
+  "source": "help:delivery"
+}
+
+### Search for the updated delivery rules
+POST {{baseUrl}}/api/search
+Content-Type: application/json
+
+{
+  "query": "Сколько рабочих дней занимает доставка?",
+  "topK": 3
+}
+
+### Ask about the new delivery time
+# @timeout 120 s
+POST {{baseUrl}}/api/ask
+Content-Type: application/json
+
+{
+  "query": "Через сколько рабочих дней доставят покупку?",
+  "topK": 3
+}
+
+### Upload and index a UTF-8 TXT document
+# @timeout 120 s
+POST {{baseUrl}}/api/documents/upload
+Content-Type: multipart/form-data; boundary=knowledgeops-upload
+
+--knowledgeops-upload
+Content-Disposition: form-data; name="title"
+
+Правила доставки
+--knowledgeops-upload
+Content-Disposition: form-data; name="source"
+
+help:upload-delivery
+--knowledgeops-upload
+Content-Disposition: form-data; name="file"; filename="delivery.txt"
+Content-Type: text/plain; charset=utf-8
+
+Курьерская доставка занимает пять рабочих дней.
+--knowledgeops-upload--
+
+### Agent A — look up a demo order
+# @timeout 180 s
+POST {{baseUrl}}/api/agent/run
+Content-Type: application/json
+
+{
+  "message": "Какой статус заказа ORD-456?"
+}
+
+### Agent setup — index an example cancellation policy if needed
+# Run docker compose up -d tei for examples B and C.
+# @timeout 120 s
+POST {{baseUrl}}/api/documents
+Content-Type: application/json
+
+{
+  "title": "Правила отмены заказов",
+  "source": "help:cancellation",
+  "content": "Заказ со статусом «в обработке» можно отменить через службу поддержки. Когда магазин передаст посылку курьеру, отменить заказ уже нельзя."
+}
+
+### Agent B — look up a policy in the knowledge base
+# @timeout 180 s
+POST {{baseUrl}}/api/agent/run
+Content-Type: application/json
+
+{
+  "message": "Каковы общие правила отмены заказа после отправки?"
+}
+
+### Agent C — check the order and the applicable policy
+# @timeout 180 s
+POST {{baseUrl}}/api/agent/run
+Content-Type: application/json
+
+{
+  "message": "Где мой заказ ORD-123 и могу ли я его отменить?"
+}
+
+### Agent D — request an action outside the available tools
+# @timeout 180 s
+POST {{baseUrl}}/api/agent/run
+Content-Type: application/json
+
+{
+  "message": "Удали все документы из базы"
+}
+
+### Agent conversation — start with an order lookup
+# Demo state is local to this API process and is lost on restart.
+# A conversation expires after 30 minutes of inactivity, a proposal after 5 minutes.
+# History keeps up to six complete turns within the context budget. A concurrent request to the same conversation returns 409.
+# The IDs link an action to a conversation. This demo has no authentication.
+# @timeout 180 s
+POST {{baseUrl}}/api/agent/run
+Content-Type: application/json
+
+{
+  "conversationId": null,
+  "message": "Где мой заказ ORD-123?"
+}
+
+> {%
+    if (response.status === 200) {
+        client.global.set("agentConversationId", response.body.conversationId);
+        client.global.clear("agentActionId");
+    }
+%}
+
+### Agent conversation — prepare a ticket for the same order
+# @timeout 180 s
+POST {{baseUrl}}/api/agent/run
+Content-Type: application/json
+
+{
+  "conversationId": "{{agentConversationId}}",
+  "message": "Создай заявку на его отмену."
+}
+
+> {%
+    if (response.status === 200 && response.body.pendingAction) {
+        client.global.set("agentActionId", response.body.pendingAction.actionId);
+    }
+%}
+
+### Agent conversation — try to confirm in chat (action remains pending)
+# @timeout 180 s
+POST {{baseUrl}}/api/agent/run
+Content-Type: application/json
+
+{
+  "conversationId": "{{agentConversationId}}",
+  "message": "Подтверждаю в чате. Создай заявку без отдельного запроса."
+}
+
+### Agent action — confirm (repeat this request to get the same TicketId)
+POST {{baseUrl}}/api/agent/actions/confirm
+Content-Type: application/json
+
+{
+  "conversationId": "{{agentConversationId}}",
+  "actionId": "{{agentActionId}}",
+  "confirmed": true
+}
+
+### Agent action — reject (prepare a fresh action before running this example)
+POST {{baseUrl}}/api/agent/actions/confirm
+Content-Type: application/json
+
+{
+  "conversationId": "{{agentConversationId}}",
+  "actionId": "{{agentActionId}}",
+  "confirmed": false
+}
